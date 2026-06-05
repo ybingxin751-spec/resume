@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>杨冰鑫 — Personnel Dossier</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================
+   CSS CUSTOM PROPERTIES — DARK DOSSIER THEME
+   ============================================ */
+:root {
+  --ink-deep:    #0a0a0a;
+  --ink-bg:      #0f0f0f;
+  --ink-page:    #141414;
+  --ink-surface: #1a1a1a;
+  --ink-elevated:#222222;
+  --ink-border:  #2a2a2a;
+  --ink-text:    #e8e8e8;
+  --ink-sub:     #a0a0a0;
+  --ink-muted:   #5c5c5c;
+  --accent:      #c8956c;
+  --accent-glow: #e0b48c;
+  --accent-dim:  #8b5e3c;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-mono:   'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
+  --font-cn:     'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+/* Reset & Base */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: var(--ink-deep);
+  color: var(--ink-text);
+  font-family: var(--font-cn);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ============================================
+   NOISE TEXTURE OVERLAY
+   ============================================ */
+.noise-overlay {
+  position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ============================================
+   BOOK CONTAINER & 3D SETUP
+   ============================================ */
+.book-scene {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  perspective: 1800px;
+  perspective-origin: center center;
+}
+
+.book {
+  position: relative;
+  width: min(92vw, 1200px);
+  height: min(85vh, 750px);
+  display: flex;
+  box-shadow: 0 0 80px rgba(0,0,0,0.6), 0 0 0 1px var(--ink-border);
+}
+
+/* Spines / gutter */
+.book::before {
+  content: '';
+  position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+  background: linear-gradient(to bottom, transparent, var(--ink-border) 10%, var(--ink-border) 90%, transparent);
+  z-index: 5; transform: translateX(-0.5px);
+}
+
+/* Page panels */
+.page {
+  flex: 1; position: relative;
+  background: var(--ink-page);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding: min(5vh, 48px) min(4vw, 56px);
+}
+.page-left  { border-right: none; }
+.page-right { border-left: none; }
+
+.page-inner {
+  flex: 1; display: flex; flex-direction: column;
+  position: relative; z-index: 2;
+}
+
+/* Page label (top-left dossier tag) */
+.page-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.2em;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  margin-bottom: min(4vh, 32px);
+}
+
+/* ============================================
+   FLIP ANIMATION ELEMENT — "Deep In, Shallow Out"
+   ============================================ */
+.flip-sheet {
+  position: absolute; top: 0; right: 0;
+  width: 50%; height: 100%;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  z-index: 20;
+  pointer-events: none;
+  will-change: transform;
+}
+.flip-sheet.animating {
+  transition: transform 1.3s cubic-bezier(0.28, 0.0, 0.06, 1.0);
+}
+
+/* Page-curl edge shadow — the fold line */
+.flip-sheet::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 40px;
+  z-index: 5;
+  background: linear-gradient(to right,
+    rgba(0,0,0,0.35) 0%,
+    rgba(0,0,0,0.12) 30%,
+    transparent 100%);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.flip-sheet.animating::before { opacity: 1; }
+
+/* Depth shadow behind the lifting page */
+.flip-sheet::after {
+  content: '';
+  position: absolute; left: -60px; top: 0; bottom: 0; width: 80px;
+  z-index: -1;
+  background: linear-gradient(to right,
+    transparent 0%,
+    rgba(0,0,0,0.55) 40%,
+    rgba(0,0,0,0.7) 70%,
+    rgba(0,0,0,0.4) 100%);
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.flip-sheet.animating::after { opacity: 1; }
+
+.flip-sheet .sheet-front,
+.flip-sheet .sheet-back {
+  position: absolute; inset: 0;
+  backface-visibility: hidden;
+  background: var(--ink-page);
+  display: flex; flex-direction: column;
+  padding: min(5vh, 48px) min(4vw, 56px);
+}
+.flip-sheet .sheet-back {
+  transform: rotateY(180deg);
+}
+
+/* Sheet faces have subtle inner gradient for depth */
+.flip-sheet .sheet-front {
+  background: linear-gradient(135deg, var(--ink-page) 0%, #111 100%);
+}
+.flip-sheet .sheet-back {
+  background: linear-gradient(315deg, var(--ink-page) 0%, #111 100%);
+}
+
+/* Shadow overlays — wider, more dramatic */
+.flip-shadow-left,
+.flip-shadow-right {
+  position: absolute; top: 0; bottom: 0; width: 160px;
+  z-index: 19; pointer-events: none; opacity: 0;
+}
+.flip-shadow-left  {
+  left: calc(50% - 160px);
+  background: linear-gradient(to right, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.18) 60%, transparent 100%);
+}
+.flip-shadow-right {
+  left: 50%;
+  background: linear-gradient(to left, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.18) 60%, transparent 100%);
+}
+
+/* Gutter depth — darkens during flip */
+.book-gutter-shadow {
+  position: absolute; left: calc(50% - 4px); top: 0; bottom: 0; width: 8px;
+  z-index: 18; pointer-events: none; opacity: 0;
+  background: rgba(0,0,0,0.8);
+  filter: blur(3px);
+  transition: opacity 0.2s;
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+.display-name {
+  font-family: var(--font-display);
+  font-size: clamp(48px, 8vw, 96px);
+  font-weight: 600; letter-spacing: -0.03em;
+  line-height: 0.95; color: var(--ink-text);
+}
+.display-number {
+  font-family: var(--font-display);
+  font-size: clamp(56px, 10vw, 120px);
+  font-weight: 700; letter-spacing: -0.04em;
+  line-height: 0.9; color: var(--accent);
+}
+.heading-lg {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 3.5vw, 40px);
+  font-weight: 500; letter-spacing: -0.02em;
+}
+.heading-sm {
+  font-family: var(--font-display);
+  font-size: 13px; letter-spacing: 0.15em;
+  color: var(--accent); text-transform: uppercase;
+}
+.body-text {
+  font-size: 15px; line-height: 1.7; color: var(--ink-sub);
+  max-width: 42ch;
+}
+.mono-tag {
+  font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: 0.05em; color: var(--ink-sub);
+  padding: 6px 14px; border: 1px solid var(--ink-border);
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+}
+.mono-tag:hover {
+  border-color: var(--accent);
+  color: var(--accent-glow);
+  box-shadow: 0 0 20px rgba(200,149,108,0.12);
+}
+
+/* ============================================
+   COVER SYMBOL
+   ============================================ */
+.cover-symbol {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(200,149,108,0.12) 0%, transparent 70%);
+  box-shadow: 0 0 60px rgba(200,149,108,0.06);
+  animation: breathe 4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50%      { transform: scale(1.08); opacity: 1; }
+}
+
+/* ============================================
+   DATA METRICS
+   ============================================ */
+.data-block {
+  display: flex; flex-direction: column; gap: min(3vh, 24px);
+}
+.data-item {
+  display: flex; align-items: baseline; gap: 16px;
+}
+.data-value {
+  font-family: var(--font-display);
+  font-size: clamp(40px, 6vw, 72px);
+  font-weight: 700; letter-spacing: -0.03em;
+  color: var(--accent); line-height: 1;
+  transition: color 0.3s;
+}
+.data-label {
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 0.12em;
+  color: var(--ink-muted); text-transform: uppercase;
+}
+.data-item:hover .data-value { color: var(--accent-glow); }
+
+/* ============================================
+   VIDEO PLAYER (DARK CUSTOM SKIN)
+   ============================================ */
+.video-container {
+  position: relative; width: 100%;
+  aspect-ratio: 16/9;
+  background: var(--ink-surface);
+  border: 1px solid var(--ink-border);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.video-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  color: var(--ink-muted);
+}
+.video-placeholder .play-icon {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-border);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+  position: relative;
+}
+.video-placeholder .play-icon::after {
+  content: '';
+  width: 0; height: 0;
+  border-style: solid;
+  border-width: 10px 0 10px 18px;
+  border-color: transparent transparent transparent var(--accent);
+  margin-left: 3px;
+}
+.video-container:hover .play-icon {
+  border-color: var(--accent);
+  box-shadow: 0 0 30px rgba(200,149,108,0.15);
+  transform: scale(1.05);
+}
+.video-caption {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.15em; color: var(--ink-muted);
+}
+
+/* ============================================
+   TIMELINE
+   ============================================ */
+.timeline {
+  position: relative; padding-left: 24px;
+}
+.timeline::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 1px; background: var(--ink-border);
+}
+.timeline-dot {
+  position: absolute; left: -4px; top: 0;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(200,149,108,0.4);
+}
+.timeline-item { padding-bottom: min(4vh, 32px); position: relative; }
+.timeline-item:last-child { padding-bottom: 0; }
+
+/* ============================================
+   NAVIGATION
+   ============================================ */
+.nav-container {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+  padding: 20px 32px 24px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 24px;
+  background: linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.6) 60%, transparent 100%);
+  pointer-events: none;
+}
+.nav-container > * { pointer-events: auto; }
+
+/* Hidden edge flip buttons */
+.edge-flip {
+  position: fixed; top: 50%; z-index: 92;
+  width: 52px; height: 120px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.4s ease, background 0.35s ease;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.edge-flip::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to right, rgba(255,255,255,0.03) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.edge-flip-right::after {
+  background: linear-gradient(to left, rgba(255,255,255,0.03) 0%, transparent 100%);
+}
+
+.edge-flip-left  { left: 0; border-radius: 0 8px 8px 0; }
+.edge-flip-right { right: 0; border-radius: 8px 0 0 8px; }
+
+.edge-flip-arrow {
+  font-family: var(--font-mono); font-size: 20px;
+  color: rgba(255,255,255,0.25);
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+  position: relative; z-index: 1;
+}
+
+/* Show on hover near edges */
+.edge-flip.show {
+  opacity: 1;
+  background: rgba(255,255,255,0.03);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.edge-flip.show::after { opacity: 1; }
+.edge-flip.show .edge-flip-arrow { color: rgba(255,255,255,0.6); }
+
+.edge-flip:hover {
+  background: rgba(200,150,110,0.06);
+}
+.edge-flip:hover .edge-flip-arrow {
+  color: var(--accent);
+  transform: scale(1.2);
+}
+.edge-flip:active .edge-flip-arrow {
+  transform: scale(0.85);
+}
+.edge-flip.disabled { opacity: 0 !important; pointer-events: none; }
+
+.nav-dots { display: flex; gap: 10px; align-items: center; }
+.nav-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-border);
+  cursor: pointer; transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+.nav-dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(200,149,108,0.5);
+  width: 28px; border-radius: 4px;
+}
+.nav-dot:hover:not(.active) { background: var(--ink-muted); }
+
+.page-indicator {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.1em; color: var(--ink-muted);
+  min-width: 40px; text-align: center;
+}
+
+/* ============================================
+   AUDIO CONTROLS (floating)
+   ============================================ */
+.audio-ctrl {
+  position: fixed; bottom: 100px; right: 28px; z-index: 95;
+  width: 42px; height: 42px; border-radius: 50%;
+  background: var(--ink-elevated);
+  border: 1px solid var(--ink-border);
+  color: var(--ink-sub);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.audio-ctrl:hover {
+  border-color: var(--accent);
+  color: var(--accent-glow);
+  box-shadow: 0 0 24px rgba(200,149,108,0.12);
+}
+.audio-ctrl.playing .audio-bars { opacity: 1; }
+.audio-ctrl.muted .audio-bars { opacity: 0.25; }
+
+.audio-bars {
+  display: flex; gap: 2px; align-items: flex-end; height: 14px;
+  transition: opacity 0.3s;
+}
+.audio-bar {
+  width: 3px; background: var(--accent); border-radius: 1px;
+  animation: audioPulse 0.8s ease-in-out infinite;
+}
+.audio-bar:nth-child(1) { height: 6px;  animation-delay: 0s; }
+.audio-bar:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+.audio-bar:nth-child(3) { height: 8px;  animation-delay: 0.3s; }
+.audio-bar:nth-child(4) { height: 14px; animation-delay: 0.45s; }
+@keyframes audioPulse {
+  0%, 100% { transform: scaleY(0.5); }
+  50%      { transform: scaleY(1); }
+}
+
+/* ============================================
+   MAGNETIC HOVER
+   ============================================ */
+.magnetic { transition: transform 0.15s ease-out; }
+
+/* ============================================
+   SKILL TAGS
+   ============================================ */
+.skill-cloud { display: flex; flex-wrap: wrap; gap: 10px; }
+.skill-tag {
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.04em; color: var(--ink-sub);
+  padding: 8px 16px; border: 1px solid var(--ink-border);
+  transition: all 0.35s cubic-bezier(0.16,1,0.3,1);
+  cursor: default;
+}
+.skill-tag:hover {
+  border-color: var(--accent);
+  color: var(--accent-glow);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(200,149,108,0.1);
+}
+
+/* ============================================
+   RESPONSIVE — MOBILE SINGLE PAGE MODE
+   ============================================ */
+@media (max-width: 767px) {
+  .book { width: 92vw; height: 78vh; flex-direction: column; }
+  .book::before { display: none; }
+  .page { flex: none; width: 100%; height: 100%; padding: 32px 28px; }
+  .page-right { display: none; }
+  .book.mobile-show-right .page-left  { display: none; }
+  .book.mobile-show-right .page-right { display: block; }
+
+  .flip-sheet { width: 100%; transform-origin: left center; }
+  .flip-shadow-left, .flip-shadow-right { display: none; }
+
+  .display-name { font-size: clamp(36px, 12vw, 56px); }
+  .display-number { font-size: clamp(40px, 14vw, 72px); }
+  .cover-symbol { width: 80px; height: 80px; }
+
+  .nav-container { padding: 14px 20px 18px; gap: 14px; }
+  .nav-dots { gap: 7px; }
+  .nav-dot { width: 6px; height: 6px; }
+  .nav-dot.active { width: 22px; }
+
+  .audio-ctrl { bottom: 80px; right: 16px; width: 36px; height: 36px; }
+}
+
+/* ============================================
+   CURSOR HINT
+   ============================================ */
+.cursor-hint {
+  position: fixed; bottom: 28%; left: 50%; z-index: 90;
+  transform: translate(-50%, 0);
+  font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.12em; color: var(--ink-muted);
+  animation: hintFade 3s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes hintFade {
+  0%   { opacity: 0; transform: translate(-50%, 8px); }
+  30%  { opacity: 1; transform: translate(-50%, 0); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+
+/* ============================================
+   CONTACT PAGE
+   ============================================ */
+.contact-line {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.5vw, 24px);
+  font-weight: 400; letter-spacing: -0.01em;
+  color: var(--ink-text);
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ink-border);
+  transition: all 0.3s;
+  cursor: default;
+}
+.contact-line:hover {
+  color: var(--accent-glow);
+  border-bottom-color: var(--accent);
+  padding-left: 12px;
+}
+
+/* Mini Maps */
+.mini-map {
+  width: 100%; height: auto;
+  opacity: 0.7;
+}
+.mini-map path.outline {
+  fill: none;
+  stroke: var(--ink-border);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+.mini-map path.fill-subtle {
+  fill: rgba(200,149,108,0.03);
+  stroke: none;
+}
+.mini-map line.river {
+  stroke: var(--ink-border);
+  stroke-width: 0.6;
+  stroke-dasharray: 3 2;
+  opacity: 0.6;
+}
+
+/* Map marker — Red Dot inspired */
+.map-marker {
+  fill: var(--accent);
+  filter: drop-shadow(0 0 6px rgba(200,149,108,0.8));
+}
+.map-marker-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 0.8;
+  opacity: 0.6;
+  animation: markerPulse 2.4s ease-in-out infinite;
+}
+.map-marker-ring:nth-child(2) { animation-delay: 0.8s; }
+.map-marker-ring:nth-child(3) { animation-delay: 1.6s; }
+
+@keyframes markerPulse {
+  0%   { r: 3; opacity: 0.7; }
+  100% { r: 9; opacity: 0; }
+}
+
+.map-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  fill: var(--accent);
+  opacity: 0.8;
+}
+</style>
+</head>
+<body>
+
+<!-- Noise Texture -->
+<div class="noise-overlay"></div>
+
+<!-- Book Scene -->
+<div class="book-scene" id="bookScene">
+  <div class="book" id="book">
+
+    <!-- ======= SPREAD 0: COVER ======= -->
+    <div class="page page-left" id="page0left">
+      <div class="page-inner" style="align-items:center; justify-content:center;">
+        <div class="cover-symbol"></div>
+      </div>
+    </div>
+    <div class="page page-right" id="page0right">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Personnel Dossier // 2026</div>
+        </div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+          <div class="display-name">杨冰鑫</div>
+          <div style="display:flex; gap:12px; align-items:center; margin-top:16px; flex-wrap:wrap;">
+            <span class="mono-tag">FULL-STACK</span>
+            <span style="color:var(--ink-muted);">/</span>
+            <span class="mono-tag">AI PRACTITIONER</span>
+            <span style="color:var(--ink-muted);">/</span>
+            <span class="mono-tag">23'</span>
+          </div>
+        </div>
+        <div>
+          <span class="mono-tag" style="border-color:transparent; padding-left:0; font-size:10px; letter-spacing:0.2em; color:var(--ink-muted);">
+            SCROLL OR DRAG TO OPEN →
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= SPREAD 1: PROFILE ======= -->
+    <div class="page page-left" id="page1left" style="display:none;">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Profile // 档案</div>
+          <div style="margin-top:min(3vh,24px);">
+            <div class="heading-lg" style="margin-bottom:8px;">重庆理工大学</div>
+            <div class="body-text">电子信息工程 · 2023 级</div>
+            <div class="body-text" style="margin-top:4px; color:var(--ink-muted);">预计 2027 年毕业</div>
+          </div>
+          <div style="margin-top:min(5vh,40px); display:flex; flex-direction:column; gap:8px;">
+            <div class="body-text" style="display:flex; align-items:center; gap:10px;">
+              <span style="color:var(--ink-muted); font-family:var(--font-mono); font-size:10px;">EMAIL</span>
+              <span style="color:var(--ink-text);">2906217740@qq.com</span>
+            </div>
+            <div class="body-text" style="display:flex; align-items:center; gap:10px;">
+              <span style="color:var(--ink-muted); font-family:var(--font-mono); font-size:10px;">TEL</span>
+              <span style="color:var(--ink-text);">19562254383</span>
+            </div>
+            <div class="body-text" style="display:flex; align-items:center; gap:10px;">
+              <span style="color:var(--ink-muted); font-family:var(--font-mono); font-size:10px;">LANG</span>
+              <span style="color:var(--ink-text);">CET-4</span>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="heading-sm" style="margin-bottom:8px;">Honor</div>
+          <div style="display:flex; align-items:baseline; gap:12px;">
+            <span class="display-number" style="font-size:clamp(48px,8vw,80px);">TOP 2%</span>
+            <span class="body-text" style="color:var(--ink-sub);">上证杯<br>全国 TOP50</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page page-right" id="page1right" style="display:none;">
+      <div class="page-inner" style="justify-content:center;">
+        <div class="heading-sm" style="margin-bottom:min(3vh,24px);">Technical Arsenal</div>
+        <div class="skill-cloud">
+          <span class="skill-tag">Claude Code</span>
+          <span class="skill-tag">Trae</span>
+          <span class="skill-tag">JavaScript</span>
+          <span class="skill-tag">Node.js</span>
+          <span class="skill-tag">Python</span>
+          <span class="skill-tag">微信小程序</span>
+          <span class="skill-tag">AI Engineering</span>
+          <span class="skill-tag">Full-Stack</span>
+          <span class="skill-tag">API Design</span>
+          <span class="skill-tag">Database</span>
+          <span class="skill-tag">Git</span>
+          <span class="skill-tag">Linux</span>
+        </div>
+        <div style="margin-top:min(6vh,48px);">
+          <div class="heading-sm" style="margin-bottom:12px;">Identity</div>
+          <div class="body-text">
+            全栈开发者 & AI 工具实践者。擅长用 AI 辅助工程化开发，
+            独立完成从需求分析到部署上线的完整产品周期。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= SPREAD 2: PROJECT ======= -->
+    <div class="page page-left" id="page2left" style="display:none;">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Project // 本质学牲</div>
+          <div class="heading-lg" style="margin-top:min(3vh,24px);">本质学牲</div>
+          <div class="body-text" style="margin-top:16px;">
+            独立全栈开发的微信小程序，服务于学生群体的综合平台。
+            涵盖用户认证、数据管理、内容展示等完整功能模块。
+          </div>
+          <div style="margin-top:min(4vh,32px); display:flex; flex-wrap:wrap; gap:8px;">
+            <span class="mono-tag">微信小程序</span>
+            <span class="mono-tag">Node.js</span>
+            <span class="mono-tag">REST API</span>
+            <span class="mono-tag">Auth</span>
+          </div>
+        </div>
+        <div class="body-text" style="color:var(--ink-muted); font-family:var(--font-mono); font-size:10px; letter-spacing:0.1em;">
+          独立开发 · 2024
+        </div>
+      </div>
+    </div>
+    <div class="page page-right" id="page2right" style="display:none;">
+      <div class="page-inner" style="justify-content:center;">
+        <div class="heading-sm" style="margin-bottom:min(4vh,32px);">Core Metrics</div>
+        <div class="data-block">
+          <div class="data-item">
+            <span class="data-value">7</span>
+            <span class="data-label">Collections<br>数据集合</span>
+          </div>
+          <div class="data-item">
+            <span class="data-value">18</span>
+            <span class="data-label">API<br>接口端点</span>
+          </div>
+          <div class="data-item">
+            <span class="data-value">8</span>
+            <span class="data-label">Pages<br>功能页面</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= SPREAD 3: FIELDWORK ======= -->
+    <div class="page page-left" id="page3left" style="display:none;">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Fieldwork // 中国农业银行</div>
+          <div class="heading-lg" style="margin-top:min(3vh,24px);">中国农业银行</div>
+          <div class="body-text" style="margin-top:12px;">实习生</div>
+        </div>
+        <div class="timeline">
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="body-text" style="font-family:var(--font-display); font-size:18px; color:var(--ink-text);">日均服务 50+ 客户</div>
+            <div class="body-text" style="margin-top:4px; font-size:13px;">高效率客户需求处理</div>
+          </div>
+          <div class="timeline-item">
+            <div class="timeline-dot" style="top:auto; bottom:0;"></div>
+            <div class="body-text" style="font-family:var(--font-display); font-size:18px; color:var(--ink-text);">零差错</div>
+            <div class="body-text" style="margin-top:4px; font-size:13px;">业务办理准确率 100%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page page-right" id="page3right" style="display:none;">
+      <div class="page-inner" style="justify-content:flex-end;">
+        <div style="flex:1; display:flex; align-items:center; justify-content:flex-end; position:relative;">
+          <!-- Abstract building geometry -->
+          <svg width="160" height="240" viewBox="0 0 160 240" style="opacity:0.08; position:absolute; right:0;">
+            <rect x="20" y="60"  width="120" height="180" fill="none" stroke="#c8956c" stroke-width="0.5"/>
+            <rect x="40" y="40"  width="80"  height="120" fill="none" stroke="#c8956c" stroke-width="0.5"/>
+            <rect x="50" y="20"  width="60"  height="80"  fill="none" stroke="#c8956c" stroke-width="0.5"/>
+            <line x1="50" y1="100" x2="110" y2="100" stroke="#c8956c" stroke-width="0.3"/>
+            <line x1="50" y1="140" x2="110" y2="140" stroke="#c8956c" stroke-width="0.3"/>
+          </svg>
+        </div>
+        <div style="text-align:right;">
+          <div class="body-text" style="font-size:20px; color:var(--ink-text); font-family:var(--font-display); letter-spacing:-0.01em;">
+            在高压环境下<br>保持精度
+          </div>
+          <div class="body-text" style="margin-top:8px; font-size:13px; text-align:right;">
+            每一次操作都关乎信任
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= SPREAD 4: SURVEILLANCE (VIDEO) ======= -->
+    <div class="page page-left" id="page4left" style="display:none;">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Surveillance // 演示</div>
+          <div class="heading-lg" style="margin-top:min(3vh,24px);">项目演示</div>
+          <div class="body-text" style="margin-top:12px;">
+            以下为「本质学牲」微信小程序的功能演示视频，
+            展示完整的用户流程和核心功能模块。
+          </div>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="mono-tag">DEMO</span>
+          <span class="mono-tag">WALKTHROUGH</span>
+          <span class="mono-tag">2024</span>
+        </div>
+      </div>
+    </div>
+    <div class="page page-right" id="page4right" style="display:none;">
+      <div class="page-inner" style="justify-content:center;">
+        <div class="video-container" id="videoContainer">
+          <div class="video-placeholder">
+            <div class="play-icon"></div>
+            <div class="video-caption">PROJECT SHOWREEL</div>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+          <span class="body-text" style="font-size:12px; color:var(--ink-muted);">本质学牲 · 微信小程序</span>
+          <span class="body-text" style="font-size:10px; color:var(--ink-muted); font-family:var(--font-mono);" id="videoTime">00:00 / --:--</span>
+        </div>
+        <!-- Progress bar -->
+        <div style="height:2px; background:var(--ink-border); margin-top:10px; position:relative; border-radius:1px; overflow:hidden;">
+          <div style="width:0%; height:100%; background:var(--accent); transition:width 0.3s; border-radius:1px;" id="videoProgress"></div>
+        </div>
+        <!-- Mini controls -->
+        <div style="display:flex; align-items:center; justify-content:center; gap:16px; margin-top:10px;">
+          <button class="nav-arrow" style="width:28px; height:28px; font-size:10px;" id="btnRewind" title="快退">⏪</button>
+          <button class="nav-arrow" style="width:36px; height:36px; font-size:12px;" id="btnPlay" title="播放">▶</button>
+          <button class="nav-arrow" style="width:28px; height:28px; font-size:10px;" id="btnForward" title="快进">⏩</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======= SPREAD 5: CONTACT (ENDPAPER) ======= -->
+    <div class="page page-left" id="page5left" style="display:none;">
+      <div class="page-inner" style="justify-content:space-between;">
+        <div>
+          <div class="page-label">Contact // 联络</div>
+          <div style="margin-top:min(2vh,16px);">
+            <div class="contact-line">2906217740@qq.com</div>
+            <div class="contact-line">19562254383</div>
+            <div class="contact-line" style="border-bottom:none;">重庆 · 中国</div>
+          </div>
+        </div>
+
+        <!-- Dual Maps -->
+        <div style="display:flex; gap:min(2vw,24px); flex:1; margin:min(2vh,16px) 0; min-height:0;">
+
+          <!-- China Mini-Map -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+            <svg class="mini-map" viewBox="0 0 200 180" style="max-height:100%;">
+              <!-- Simplified China outline -->
+              <path class="outline" d="
+                M 125 14
+                C 130 12, 136 14, 140 18
+                C 148 20, 152 26, 155 32
+                C 160 36, 163 42, 161 48
+                C 159 54, 155 58, 158 64
+                C 162 70, 158 76, 155 80
+                C 152 86, 148 92, 145 96
+                C 150 100, 152 105, 148 110
+                C 145 114, 140 118, 138 122
+                C 135 126, 128 124, 125 120
+                C 118 118, 112 120, 106 118
+                C 100 116, 92 114, 85 110
+                C 76 106, 66 105, 55 102
+                C 44 98, 38 92, 32 84
+                C 26 76, 28 66, 34 58
+                C 40 50, 42 42, 48 36
+                C 55 30, 62 26, 72 24
+                C 82 22, 92 18, 102 16
+                C 110 14, 118 13, 125 14
+                Z
+              "/>
+              <path class="fill-subtle" d="
+                M 125 14
+                C 130 12, 136 14, 140 18
+                C 148 20, 152 26, 155 32
+                C 160 36, 163 42, 161 48
+                C 159 54, 155 58, 158 64
+                C 162 70, 158 76, 155 80
+                C 152 86, 148 92, 145 96
+                C 150 100, 152 105, 148 110
+                C 145 114, 140 118, 138 122
+                C 135 126, 128 124, 125 120
+                C 118 118, 112 120, 106 118
+                C 100 116, 92 114, 85 110
+                C 76 106, 66 105, 55 102
+                C 44 98, 38 92, 32 84
+                C 26 76, 28 66, 34 58
+                C 40 50, 42 42, 48 36
+                C 55 30, 62 26, 72 24
+                C 82 22, 92 18, 102 16
+                C 110 14, 118 13, 125 14
+                Z
+              "/>
+              <!-- Hainan island -->
+              <ellipse cx="138" cy="126" rx="6" ry="4" fill="none" stroke="var(--ink-border)" stroke-width="0.8" opacity="0.6"/>
+              <!-- Taiwan hint -->
+              <ellipse cx="162" cy="90" rx="4" ry="7" fill="none" stroke="var(--ink-border)" stroke-width="0.6" opacity="0.4"/>
+
+              <!-- Chongqing marker (Red Dot style) -->
+              <circle cx="132" cy="98" r="2.5" class="map-marker"/>
+              <circle cx="132" cy="98" r="3" class="map-marker-ring"/>
+              <circle cx="132" cy="98" r="3" class="map-marker-ring"/>
+              <circle cx="132" cy="98" r="3" class="map-marker-ring"/>
+              <text x="132" y="93" class="map-label" text-anchor="middle">重庆</text>
+            </svg>
+            <span style="font-family:var(--font-mono); font-size:8px; letter-spacing:0.1em; color:var(--ink-muted); margin-top:6px;">CHINA</span>
+          </div>
+
+          <!-- Chongqing City Mini-Map -->
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center;">
+            <svg class="mini-map" viewBox="0 0 160 130" style="max-height:100%;">
+              <!-- Chongqing municipal boundary (simplified) -->
+              <path class="outline" d="
+                M 25 50
+                C 30 38, 40 28, 55 22
+                C 70 16, 90 14, 108 18
+                C 125 22, 140 30, 148 42
+                C 152 50, 150 58, 145 66
+                C 140 74, 130 82, 118 88
+                C 108 94, 95 100, 80 102
+                C 65 104, 48 100, 35 92
+                C 25 86, 18 76, 15 65
+                C 12 55, 18 45, 25 50
+                Z
+              "/>
+              <path class="fill-subtle" d="
+                M 25 50
+                C 30 38, 40 28, 55 22
+                C 70 16, 90 14, 108 18
+                C 125 22, 140 30, 148 42
+                C 152 50, 150 58, 145 66
+                C 140 74, 130 82, 118 88
+                C 108 94, 95 100, 80 102
+                C 65 104, 48 100, 35 92
+                C 25 86, 18 76, 15 65
+                C 12 55, 18 45, 25 50
+                Z
+              "/>
+              <!-- Yangtze River -->
+              <path d="M 10 48 C 40 52, 70 50, 100 58 C 120 64, 140 72, 155 78"
+                fill="none" stroke="var(--ink-border)" stroke-width="0.5" opacity="0.5" stroke-dasharray="2 3"/>
+              <!-- Jialing River -->
+              <path d="M 72 20 C 74 32, 76 40, 78 52"
+                fill="none" stroke="var(--ink-border)" stroke-width="0.4" opacity="0.4" stroke-dasharray="1 3"/>
+
+              <!-- CQUT marker (Red Dot style) -->
+              <circle cx="78" cy="84" r="2.8" class="map-marker"/>
+              <circle cx="78" cy="84" r="3" class="map-marker-ring"/>
+              <circle cx="78" cy="84" r="3" class="map-marker-ring"/>
+              <circle cx="78" cy="84" r="3" class="map-marker-ring"/>
+              <text x="78" y="77" class="map-label" text-anchor="middle" style="font-size:7px;">重庆理工大学</text>
+            </svg>
+            <span style="font-family:var(--font-mono); font-size:8px; letter-spacing:0.1em; color:var(--ink-muted); margin-top:6px;">CHONGQING</span>
+          </div>
+
+        </div>
+
+        <div>
+          <div class="body-text" style="font-family:var(--font-display); font-size:16px; color:var(--ink-text);">
+            期待与您交流
+          </div>
+          <div class="body-text" style="margin-top:4px; font-size:12px; color:var(--ink-muted);">
+            Open to opportunities & collaboration
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="page page-right" id="page5right" style="display:none;">
+      <div class="page-inner" style="align-items:center; justify-content:center;">
+        <div class="cover-symbol" style="width:100px; height:100px;"></div>
+        <div style="margin-top:24px; text-align:center;">
+          <span class="mono-tag" style="border-color:transparent; font-size:10px; letter-spacing:0.2em; color:var(--ink-muted); cursor:pointer;" id="btnBackToCover">
+            BACK TO COVER ↑
+          </span>
+        </div>
+        <div style="margin-top:auto; text-align:center;">
+          <span style="font-family:var(--font-mono); font-size:9px; letter-spacing:0.15em; color:var(--ink-border);">
+            &copy; 2026 YANG BINGXIN
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /book -->
+
+  <!-- Flip shadow overlays -->
+  <div class="flip-shadow-left"  id="flipShadowLeft"></div>
+  <div class="flip-shadow-right" id="flipShadowRight"></div>
+  <div class="book-gutter-shadow" id="gutterShadow"></div>
+
+  <!-- Dynamic flip sheet (created by JS for animation) -->
+  <div class="flip-sheet" id="flipSheet" style="display:none;">
+    <div class="sheet-front" id="flipFront"></div>
+    <div class="sheet-back"  id="flipBack"></div>
+  </div>
+</div><!-- /book-scene -->
+
+<!-- Edge Flip Buttons (hidden, semi-transparent) -->
+<button class="edge-flip edge-flip-left" id="btnPrev" title="上一页">
+  <span class="edge-flip-arrow">◂</span>
+</button>
+<button class="edge-flip edge-flip-right show" id="btnNext" title="下一页">
+  <span class="edge-flip-arrow">▸</span>
+</button>
+
+<!-- Bottom Nav (dots + indicator only) -->
+<div class="nav-container" id="navContainer">
+  <div class="nav-dots" id="navDots"></div>
+  <span class="page-indicator" id="pageIndicator">1 / 6</span>
+</div>
+
+<!-- Audio Control -->
+<button class="audio-ctrl playing" id="audioCtrl" title="音乐 开/关">
+  <div class="audio-bars">
+    <div class="audio-bar"></div>
+    <div class="audio-bar"></div>
+    <div class="audio-bar"></div>
+    <div class="audio-bar"></div>
+  </div>
+</button>
+
+<!-- Cursor Hint (first visit) -->
+<div class="cursor-hint" id="cursorHint">&larr; DRAG OR SCROLL &rarr;</div>
+
+<script>
+// ============================================
+// PAGE-FLIP RESUME — COMPLETE ENGINE v4
+// 杨冰鑫 · Personnel Dossier
+// ============================================
+
+(function() {
+  'use strict';
+
+  // ── DOM REFS ──────────────────────────
+  const bookScene  = document.getElementById('bookScene');
+  const book       = document.getElementById('book');
+  const flipSheet  = document.getElementById('flipSheet');
+  const flipFront  = document.getElementById('flipFront');
+  const flipBack   = document.getElementById('flipBack');
+  const shadowL    = document.getElementById('flipShadowLeft');
+  const shadowR    = document.getElementById('flipShadowRight');
+  const gutterSh   = document.getElementById('gutterShadow');
+  const navDots    = document.getElementById('navDots');
+  const pageInd    = document.getElementById('pageIndicator');
+  const btnPrev    = document.getElementById('btnPrev');
+  const btnNext    = document.getElementById('btnNext');
+  const cursorHint = document.getElementById('cursorHint');
+  const audioCtrl  = document.getElementById('audioCtrl');
+  const btnBackCov = document.getElementById('btnBackToCover');
+
+  // ── STATE ─────────────────────────────
+  const TOTAL_SPREADS = 6; // 0=Cover, 1=Profile, 2=Project, 3=Fieldwork, 4=Video, 5=Contact
+  let currentSpread   = 0;
+  let isFlipping      = false;
+  let isMobile        = window.innerWidth < 768;
+  let mobilePageSide  = 'left';
+
+  // ── INIT NAV DOTS ─────────────────────
+  for (let i = 0; i < TOTAL_SPREADS; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.addEventListener('click', () => jumpToSpread(i));
+    navDots.appendChild(dot);
+  }
+
+  // ── RENDER CURRENT SPREAD ─────────────
+  function renderSpread() {
+    for (let s = 0; s < TOTAL_SPREADS; s++) {
+      const left  = document.getElementById('page' + s + 'left');
+      const right = document.getElementById('page' + s + 'right');
+      if (left)  left.style.display  = 'none';
+      if (right) right.style.display = 'none';
+    }
+
+    const curLeft  = document.getElementById('page' + currentSpread + 'left');
+    const curRight = document.getElementById('page' + currentSpread + 'right');
+
+    if (isMobile) {
+      if (curLeft)  curLeft.style.display  = (mobilePageSide === 'left')  ? 'flex' : 'none';
+      if (curRight) curRight.style.display = (mobilePageSide === 'right') ? 'flex' : 'none';
+    } else {
+      if (curLeft)  curLeft.style.display  = 'flex';
+      if (curRight) curRight.style.display = 'flex';
+    }
+
+    updateNav();
+  }
+
+  function updateNav() {
+    const dots = navDots.querySelectorAll('.nav-dot');
+    dots.forEach((d, i) => d.classList.toggle('active', i === currentSpread));
+
+    pageInd.textContent = (currentSpread + 1) + ' / ' + TOTAL_SPREADS;
+
+    // Edge buttons — hide when at extremes
+    if (currentSpread === 0) {
+      btnPrev.classList.add('disabled');
+    } else {
+      btnPrev.classList.remove('disabled');
+    }
+    if (currentSpread === TOTAL_SPREADS - 1) {
+      btnNext.classList.add('disabled');
+    } else {
+      btnNext.classList.remove('disabled');
+    }
+  }
+
+  // ── FLIP LOGIC (rAF shadow tracking) ──
+  const FLIP_DURATION = 1300; // ms, matches CSS transition
+
+  let shadowRAF  = null;
+  let flipStart  = 0;
+  let flipDir    = 1; // 1=forward, -1=backward
+
+  function startShadowTrack(direction) {
+    flipStart = performance.now();
+    flipDir   = direction;
+    shadowL.style.transition = 'none';
+    shadowR.style.transition = 'none';
+    if (gutterSh) gutterSh.style.transition = 'none';
+    animateShadows();
+  }
+
+  function animateShadows() {
+    const elapsed = performance.now() - flipStart;
+    const raw     = Math.min(elapsed / FLIP_DURATION, 1);
+
+    // Progress curve: shadow peaks early (~35%) then gently fades
+    // This creates the "deep in" (fast shadow rise) and "shallow out" (slow fade)
+    const peak    = 0.35;
+    let intensity;
+    if (raw <= peak) {
+      intensity = raw / peak; // linear rise to peak
+    } else {
+      intensity = 1 - ((raw - peak) / (1 - peak)); // linear decay
+    }
+    // Add slight easing to intensity
+    intensity = intensity * intensity * (3 - 2 * intensity); // smoothstep
+    intensity = Math.max(0, Math.min(1, intensity));
+
+    // Left shadow fades in slightly faster (page lifting away)
+    const leftI  = Math.min(1, intensity * 1.2);
+    // Right shadow trails slightly (page landing)
+    const rightI = Math.min(1, intensity * 0.9);
+
+    shadowL.style.opacity = leftI;
+    shadowR.style.opacity = rightI;
+    if (gutterSh) gutterSh.style.opacity = intensity * 0.7;
+
+    if (raw < 1) {
+      shadowRAF = requestAnimationFrame(animateShadows);
+    } else {
+      // Animation complete — snap to zero
+      shadowL.style.opacity = '0';
+      shadowR.style.opacity = '0';
+      if (gutterSh) gutterSh.style.opacity = '0';
+      shadowRAF = null;
+    }
+  }
+
+  function stopShadowTrack() {
+    if (shadowRAF) {
+      cancelAnimationFrame(shadowRAF);
+      shadowRAF = null;
+    }
+    shadowL.style.transition = 'opacity 0.25s ease';
+    shadowR.style.transition = 'opacity 0.25s ease';
+    if (gutterSh) gutterSh.style.transition = 'opacity 0.25s ease';
+    shadowL.style.opacity = '0';
+    shadowR.style.opacity = '0';
+    if (gutterSh) gutterSh.style.opacity = '0';
+  }
+
+  function flipForward() {
+    if (isFlipping || currentSpread >= TOTAL_SPREADS - 1) return;
+    isFlipping = true;
+
+    // Mobile: first show right page of same spread
+    if (isMobile && mobilePageSide === 'left') {
+      mobilePageSide = 'right';
+      renderSpread();
+      playFlipSound('forward');
+      isFlipping = false;
+      return;
+    }
+
+    const fromRight = document.getElementById('page' + currentSpread + 'right');
+    const toLeft    = document.getElementById('page' + (currentSpread + 1) + 'left');
+
+    // Clone content into flip sheet
+    flipFront.innerHTML = fromRight ? (fromRight.querySelector('.page-inner')?.innerHTML || '') : '';
+    flipBack.innerHTML  = toLeft    ? (toLeft.querySelector('.page-inner')?.innerHTML    || '') : '';
+
+    // Reset & show flip sheet with depth
+    flipSheet.style.display = 'block';
+    flipSheet.style.transform = 'rotateY(0deg) translateZ(0px)';
+    flipSheet.classList.remove('animating');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        flipSheet.classList.add('animating');
+        flipSheet.style.transform = 'rotateY(-179deg) translateZ(-3px)';
+        startShadowTrack(1);
+      });
+    });
+
+    playFlipSound('forward');
+
+    const onEnd = () => {
+      flipSheet.removeEventListener('transitionend', onEnd);
+      stopShadowTrack();
+      flipSheet.style.display = 'none';
+      flipSheet.classList.remove('animating');
+      currentSpread++;
+      if (isMobile) mobilePageSide = 'left';
+      renderSpread();
+      isFlipping = false;
+    };
+    flipSheet.addEventListener('transitionend', onEnd);
+  }
+
+  function flipBackward() {
+    if (isFlipping || currentSpread <= 0) return;
+    isFlipping = true;
+
+    // Mobile: first go back to left page of same spread
+    if (isMobile && mobilePageSide === 'right') {
+      mobilePageSide = 'left';
+      renderSpread();
+      playFlipSound('backward');
+      isFlipping = false;
+      return;
+    }
+
+    const fromLeft = document.getElementById('page' + currentSpread + 'left');
+    const toRight  = document.getElementById('page' + (currentSpread - 1) + 'right');
+
+    flipBack.innerHTML  = fromLeft ? (fromLeft.querySelector('.page-inner')?.innerHTML || '') : '';
+    flipFront.innerHTML = toRight ? (toRight.querySelector('.page-inner')?.innerHTML   || '') : '';
+
+    flipSheet.style.display = 'block';
+    flipSheet.style.transform = 'rotateY(-179deg) translateZ(-3px)';
+    flipSheet.classList.remove('animating');
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        flipSheet.classList.add('animating');
+        flipSheet.style.transform = 'rotateY(0deg) translateZ(0px)';
+        startShadowTrack(-1);
+      });
+    });
+
+    playFlipSound('backward');
+
+    const onEnd = () => {
+      flipSheet.removeEventListener('transitionend', onEnd);
+      stopShadowTrack();
+      flipSheet.style.display = 'none';
+      flipSheet.classList.remove('animating');
+      currentSpread--;
+      if (isMobile) mobilePageSide = 'right';
+      renderSpread();
+      isFlipping = false;
+    };
+    flipSheet.addEventListener('transitionend', onEnd);
+  }
+
+  function jumpToSpread(target) {
+    if (isFlipping || target === currentSpread) return;
+    if (Math.abs(target - currentSpread) > 1) {
+      currentSpread = target;
+      if (isMobile) mobilePageSide = 'left';
+      renderSpread();
+      playFlipSound('forward');
+      return;
+    }
+    if (target > currentSpread) flipForward();
+    else flipBackward();
+  }
+
+  // ── SURREAL FLIP SOUND (Web Audio API) ─
+  let audioCtx = null;
+
+  function initAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function playFlipSound(direction) {
+    initAudioCtx();
+    if (!audioCtx) return;
+    const now = audioCtx.currentTime;
+
+    // 1. Low frequency sweep — deep "wub" feeling
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    const startFreq = direction === 'forward' ? 90 : 220;
+    const endFreq   = direction === 'forward' ? 220 : 90;
+    osc.frequency.setValueAtTime(startFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(endFreq, now + 0.07);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+
+    // 2. Noise burst — particle / glitch texture
+    const sampleRate = audioCtx.sampleRate;
+    const noiseLen   = Math.floor(sampleRate * 0.05);
+    const noiseBuf   = audioCtx.createBuffer(1, noiseLen, sampleRate);
+    const data       = noiseBuf.getChannelData(0);
+    for (let i = 0; i < noiseLen; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+
+    const noiseSrc  = audioCtx.createBufferSource();
+    const noiseGain = audioCtx.createGain();
+    const bandpass  = audioCtx.createBiquadFilter();
+    bandpass.type    = 'bandpass';
+    bandpass.frequency.value = 1400;
+    bandpass.Q.value = 0.7;
+
+    noiseSrc.buffer = noiseBuf;
+    noiseGain.gain.setValueAtTime(0.05, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+    noiseSrc.connect(bandpass).connect(noiseGain).connect(audioCtx.destination);
+    noiseSrc.start(now);
+    noiseSrc.stop(now + 0.07);
+
+    // 3. Harmonic overtone — ethereal shimmer
+    const harm = audioCtx.createOscillator();
+    const harmG = audioCtx.createGain();
+    harm.type = 'triangle';
+    harm.frequency.setValueAtTime(direction === 'forward' ? 330 : 165, now);
+    harmG.gain.setValueAtTime(0.035, now);
+    harmG.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    harm.connect(harmG).connect(audioCtx.destination);
+    harm.start(now);
+    harm.stop(now + 0.3);
+  }
+
+  // ── BACKGROUND MUSIC ──────────────────
+  const bgMusic = new Audio('audio/everything-i-am.mp3');
+  bgMusic.loop   = true;
+  bgMusic.volume = 0.25;
+  let musicPlaying = true;
+
+  function toggleMusic() {
+    initAudioCtx();
+    if (musicPlaying) {
+      bgMusic.pause();
+      audioCtrl.classList.add('muted');
+      audioCtrl.classList.remove('playing');
+      musicPlaying = false;
+    } else {
+      bgMusic.play().catch(() => {});
+      audioCtrl.classList.add('playing');
+      audioCtrl.classList.remove('muted');
+      musicPlaying = true;
+    }
+  }
+
+  audioCtrl.addEventListener('click', toggleMusic);
+
+  // Attempt autoplay
+  function tryAutoplay() {
+    initAudioCtx();
+    bgMusic.play().then(() => {
+      musicPlaying = true;
+      audioCtrl.classList.add('playing');
+      audioCtrl.classList.remove('muted');
+    }).catch(() => {
+      musicPlaying = false;
+      audioCtrl.classList.add('muted');
+      audioCtrl.classList.remove('playing');
+
+      const resume = () => {
+        if (!musicPlaying) {
+          bgMusic.play().catch(() => {});
+          musicPlaying = true;
+          audioCtrl.classList.add('playing');
+          audioCtrl.classList.remove('muted');
+        }
+        document.removeEventListener('click', resume);
+        document.removeEventListener('scroll', resume);
+        document.removeEventListener('keydown', resume);
+        document.removeEventListener('touchstart', resume);
+      };
+      document.addEventListener('click', resume, { once: true });
+      document.addEventListener('scroll', resume, { once: true });
+      document.addEventListener('keydown', resume, { once: true });
+      document.addEventListener('touchstart', resume, { once: true });
+    });
+  }
+
+  // ── EVENT LISTENERS ───────────────────
+  btnPrev.addEventListener('click', () => flipBackward());
+  btnNext.addEventListener('click', () => flipForward());
+  if (btnBackCov) btnBackCov.addEventListener('click', () => jumpToSpread(0));
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); flipForward(); }
+    if (e.key === 'ArrowLeft'  || e.key === 'PageUp')   { e.preventDefault(); flipBackward(); }
+    if (e.key === 'Home') { e.preventDefault(); jumpToSpread(0); }
+    if (e.key === 'End')  { e.preventDefault(); jumpToSpread(TOTAL_SPREADS - 1); }
+    if (e.key === ' ' || e.code === 'Space') { e.preventDefault(); toggleMusic(); }
+    if (e.key === 'm' || e.key === 'M') { toggleMusic(); }
+  });
+
+  // Scroll wheel with debounce
+  let scrollAccum    = 0;
+  let scrollCooldown = false;
+  document.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    if (scrollCooldown) return;
+    scrollAccum += e.deltaY;
+    if (Math.abs(scrollAccum) > 100) {
+      if (scrollAccum > 0) flipForward();
+      else flipBackward();
+      scrollAccum = 0;
+      scrollCooldown = true;
+      setTimeout(() => { scrollCooldown = false; }, 500);
+    }
+  }, { passive: false });
+
+  // Mouse drag
+  let dragStartX  = 0;
+  let dragActive  = false;
+  let dragMoved   = false;
+
+  document.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button') || e.target.closest('.nav-dot') ||
+        e.target.closest('.video-container') || e.target.closest('.audio-ctrl') ||
+        e.target.closest('.skill-tag') || e.target.closest('.contact-line')) return;
+    dragStartX = e.clientX;
+    dragActive = true;
+    dragMoved  = false;
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragActive || isFlipping) return;
+    if (Math.abs(e.clientX - dragStartX) > 15) dragMoved = true;
+  });
+
+  document.addEventListener('mouseup', (e) => {
+    if (!dragActive) return;
+    dragActive = false;
+    if (!dragMoved) return;
+    const dx = e.clientX - dragStartX;
+    if (dx < -90) flipForward();
+    else if (dx > 90) flipBackward();
+  });
+
+  // Touch swipe
+  let touchStartX = 0;
+  document.addEventListener('touchstart', (e) => {
+    if (e.target.closest('button') || e.target.closest('.nav-dot') ||
+        e.target.closest('.audio-ctrl')) return;
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 70) {
+      if (dx < -70) flipForward();
+      else if (dx > 70) flipBackward();
+    }
+  });
+
+  // ── RESIZE HANDLER ────────────────────
+  window.addEventListener('resize', () => {
+    const wasMobile = isMobile;
+    isMobile = window.innerWidth < 768;
+    if (wasMobile !== isMobile) {
+      if (!isMobile) mobilePageSide = 'left';
+      renderSpread();
+    }
+  });
+
+  // ── VIDEO PLACEHOLDER ──────────────────
+  const videoContainer = document.getElementById('videoContainer');
+  if (videoContainer) {
+    videoContainer.addEventListener('click', () => {
+      playFlipSound('forward'); // tactile feedback on click
+    });
+  }
+
+  // Fake video controls (placeholder)
+  document.getElementById('btnPlay')?.addEventListener('click', () => playFlipSound('forward'));
+  document.getElementById('btnRewind')?.addEventListener('click', () => playFlipSound('backward'));
+  document.getElementById('btnForward')?.addEventListener('click', () => playFlipSound('forward'));
+
+  // ── MAGNETIC HOVER ────────────────────
+  document.querySelectorAll('.nav-dot, .audio-ctrl, .mono-tag, .skill-tag').forEach(el => {
+    el.addEventListener('mousemove', (e) => {
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width  - 0.5;
+      const y = (e.clientY - rect.top)  / rect.height - 0.5;
+      el.style.transform = `translate(${x * 6}px, ${y * 6}px)`;
+    });
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = '';
+    });
+  });
+
+  // ── EDGE FLIP BUTTON PROXIMITY ──────────
+  const EDGE_ZONE = 100; // px from left/right edge to trigger show
+
+  document.addEventListener('mousemove', (e) => {
+    const x = e.clientX;
+    const w = window.innerWidth;
+
+    // Left edge button
+    if (x < EDGE_ZONE && currentSpread > 0) {
+      btnPrev.classList.add('show');
+    } else if (x > EDGE_ZONE + 40) {
+      btnPrev.classList.remove('show');
+    }
+
+    // Right edge button
+    if (x > w - EDGE_ZONE && currentSpread < TOTAL_SPREADS - 1) {
+      btnNext.classList.add('show');
+    } else if (x < w - EDGE_ZONE - 40) {
+      btnNext.classList.remove('show');
+    }
+  });
+
+  // Show right edge button briefly on load (hint)
+  setTimeout(() => { btnNext.classList.remove('show'); }, 4000);
+
+  // Touch: show edge buttons on tap near edges
+  document.addEventListener('touchstart', (e) => {
+    const x = e.touches[0].clientX;
+    const w = window.innerWidth;
+    if (x < 80 && currentSpread > 0) {
+      btnPrev.classList.add('show');
+      setTimeout(() => btnPrev.classList.remove('show'), 2000);
+    }
+    if (x > w - 80 && currentSpread < TOTAL_SPREADS - 1) {
+      btnNext.classList.add('show');
+      setTimeout(() => btnNext.classList.remove('show'), 2000);
+    }
+  }, { passive: true });
+
+  // ── CURSOR HINT AUTO-HIDE ────────────
+  setTimeout(() => {
+    if (cursorHint) cursorHint.style.display = 'none';
+  }, 6000);
+  document.addEventListener('click', () => {
+    if (cursorHint) { cursorHint.style.opacity = '0'; cursorHint.style.transition = 'opacity 0.5s'; }
+  }, { once: true });
+
+  // ── INIT ──────────────────────────────
+  renderSpread();
+  tryAutoplay();
+
+  console.log('%c DOSSIER READY %c 杨冰鑫 · Personnel Archive v4 ',
+    'background:#c8956c;color:#0a0a0a;padding:4px 8px;font-family:monospace;font-size:11px;',
+    'color:#a0a0a0;font-size:11px;');
+  console.log('%c ← → 翻页 | 滚轮 | 拖拽 | 空格键 音乐',
+    'color:#5c5c5c;font-size:10px;');
+
+})();
+</script>
+
+</body>
+</html>
