@@ -446,7 +446,7 @@ body {
    ============================================ */
 .audio-ctrl {
   position: fixed; bottom: 100px; right: 28px; z-index: 95;
-  width: 42px; height: 42px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: 50%;
   background: var(--ink-elevated);
   border: 1px solid var(--ink-border);
   color: var(--ink-sub);
@@ -459,13 +459,60 @@ body {
 .audio-ctrl:hover {
   border-color: var(--accent);
   color: var(--accent-glow);
-  box-shadow: 0 0 24px rgba(200,149,108,0.12);
+  box-shadow: 0 0 28px rgba(200,149,108,0.15);
 }
-.audio-ctrl.playing .audio-icon { opacity: 1; }
-.audio-ctrl.muted .audio-icon { opacity: 0.35; }
 
-.audio-icon {
-  transition: opacity 0.35s;
+/* Breathing outer ring */
+.audio-ring {
+  position: absolute; inset: -5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.audio-ctrl.playing .audio-ring {
+  opacity: 0.25;
+  animation: audioRing 2.4s ease-in-out infinite;
+}
+.audio-ctrl.muted .audio-ring {
+  opacity: 0;
+  animation: none;
+}
+@keyframes audioRing {
+  0%, 100% { transform: scale(1); opacity: 0.12; }
+  50%      { transform: scale(1.14); opacity: 0.35; }
+}
+
+/* Sound wave bars */
+.audio-waves {
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 14px;
+}
+.wave-bar {
+  display: block; width: 3px;
+  background: currentColor;
+  border-radius: 1.5px;
+}
+.audio-ctrl.muted .wave-bar {
+  height: 3px !important;
+  animation: none !important;
+  opacity: 0.35;
+}
+.audio-ctrl.playing .wave-bar:nth-child(1) { animation: waveA 0.75s ease-in-out infinite; }
+.audio-ctrl.playing .wave-bar:nth-child(2) { animation: waveB 0.75s ease-in-out infinite 0.12s; }
+.audio-ctrl.playing .wave-bar:nth-child(3) { animation: waveC 0.75s ease-in-out infinite 0.25s; }
+
+@keyframes waveA {
+  0%, 100% { height: 5px; }
+  50%      { height: 12px; }
+}
+@keyframes waveB {
+  0%, 100% { height: 10px; }
+  50%      { height: 3px; }
+}
+@keyframes waveC {
+  0%, 100% { height: 4px; }
+  50%      { height: 13px; }
 }
 
 /* ============================================
@@ -1238,10 +1285,12 @@ body {
 
 <!-- Audio Control -->
 <button class="audio-ctrl playing" id="audioCtrl" title="音乐 开/关">
-  <svg class="audio-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-    <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/>
-  </svg>
+  <span class="audio-ring"></span>
+  <span class="audio-waves">
+    <i class="wave-bar"></i>
+    <i class="wave-bar"></i>
+    <i class="wave-bar"></i>
+  </span>
 </button>
 
 <!-- Cursor Hint (first visit) -->
@@ -1570,52 +1619,67 @@ body {
   bgMusic.loop   = true;
   bgMusic.volume = 0.25;
   let musicPlaying = true;
+  let autoUnmuted  = false;
+
+  function updateAudioUI() {
+    if (musicPlaying) {
+      audioCtrl.classList.add('playing');
+      audioCtrl.classList.remove('muted');
+    } else {
+      audioCtrl.classList.add('muted');
+      audioCtrl.classList.remove('playing');
+    }
+  }
 
   function toggleMusic() {
     initAudioCtx();
     if (musicPlaying) {
       bgMusic.pause();
-      audioCtrl.classList.add('muted');
-      audioCtrl.classList.remove('playing');
       musicPlaying = false;
     } else {
+      if (!autoUnmuted) {
+        bgMusic.muted = false;
+        bgMusic.volume = 0.25;
+        autoUnmuted = true;
+      }
       bgMusic.play().catch(() => {});
-      audioCtrl.classList.add('playing');
-      audioCtrl.classList.remove('muted');
       musicPlaying = true;
     }
+    updateAudioUI();
   }
 
   audioCtrl.addEventListener('click', toggleMusic);
 
-  // Autoplay
+  // Autoplay: start muted, unmute on first user interaction
   function tryAutoplay() {
     initAudioCtx();
+    bgMusic.muted = true;
     bgMusic.play().then(() => {
       musicPlaying = true;
-      audioCtrl.classList.add('playing');
-      audioCtrl.classList.remove('muted');
+      updateAudioUI();
     }).catch(() => {
       musicPlaying = false;
-      audioCtrl.classList.add('muted');
-      audioCtrl.classList.remove('playing');
+      updateAudioUI();
+    });
 
-      const resume = () => {
-        if (!musicPlaying) {
-          bgMusic.play().catch(() => {});
-          musicPlaying = true;
-          audioCtrl.classList.add('playing');
-          audioCtrl.classList.remove('muted');
-        }
-        document.removeEventListener('click', resume);
-        document.removeEventListener('scroll', resume);
-        document.removeEventListener('keydown', resume);
-        document.removeEventListener('touchstart', resume);
-      };
-      document.addEventListener('click', resume, { once: true });
-      document.addEventListener('scroll', resume, { once: true });
-      document.addEventListener('keydown', resume, { once: true });
-      document.addEventListener('touchstart', resume, { once: true });
+    function onFirstInteraction(e) {
+      // Don't interfere with direct button clicks
+      if (e.type === 'click' && e.target.closest('#audioCtrl')) return;
+
+      if (!autoUnmuted) {
+        bgMusic.muted = false;
+        bgMusic.volume = 0.25;
+        autoUnmuted = true;
+      }
+      if (!musicPlaying) {
+        bgMusic.play().catch(() => {});
+        musicPlaying = true;
+        updateAudioUI();
+      }
+    }
+
+    ['click', 'scroll', 'keydown', 'touchstart'].forEach(function(evt) {
+      document.addEventListener(evt, onFirstInteraction, { once: true });
     });
   }
 
